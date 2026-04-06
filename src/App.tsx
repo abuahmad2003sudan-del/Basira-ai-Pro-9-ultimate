@@ -1,3 +1,34 @@
+const [isSplashing, setIsSplashing] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsSplashing(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isSplashing) {
+    return (
+      <div className="fixed inset-0 z-[200] bg-[#050505] flex flex-col items-center justify-center">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="relative"
+        >
+          <Scale className="w-20 h-20 text-amber-500 animate-pulse" />
+          <div className="absolute inset-0 bg-amber-500/20 blur-3xl rounded-full" />
+        </motion.div>
+        <motion.h1 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-8 text-3xl font-black italic tracking-[0.3em] text-white"
+        >
+          BASIRA AI
+        </motion.h1>
+        <div className="mt-4 w-48 h-[1px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+      </div>
+    );
+            }
 import React, { useState, useEffect, useRef } from 'react';
 import { Scale, Settings, Send, FileText, Zap, Brain, Trash2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
