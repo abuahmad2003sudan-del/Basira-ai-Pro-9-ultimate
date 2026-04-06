@@ -4,17 +4,21 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/',
-  optimizeDeps: {
-    include: ['pdfjs-dist', 'mammoth']
-  },
   build: {
+    target: 'esnext',
+    minify: 'terser', // ضغط فائق للملفات
+    cssMinify: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          pdfjs: ['pdfjs-dist']
+          // تقسيم الملفات لسرعة التحميل
+          'vendor': ['react', 'react-dom', 'motion/react', 'lucide-react'],
+          'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore']
         }
       }
     }
+  },
+  optimizeDeps: {
+    include: ['pdfjs-dist', 'mammoth']
   }
 });
