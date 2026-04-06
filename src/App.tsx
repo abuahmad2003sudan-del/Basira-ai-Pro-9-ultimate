@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Scale, Settings, Send } from 'lucide-react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Scale, Settings, Send, FileText, Zap, Brain, Trash2, Download } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-// استيراد المكونات من نفس المجلد
 import DisclaimerPopup from './DisclaimerPopup';
 import SettingsPage from './SettingsPage';
 
@@ -15,37 +14,35 @@ function App() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modelType, setModelType] = useState<"gemini" | "groq">("gemini");
+  const chatEndRef = useRef<null | HTMLDivElement>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => setUser(user));
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     return () => unsubscribe();
-  }, []);
+  }, [messages]);
 
   const handleSendMessage = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage = { role: 'user', text: input };
+    const userMessage = { role: 'user', text: input, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
     try {
-      // الاتصال بالخادم الخلفي الجديد في Cloudflare
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: input }),
+        body: JSON.stringify({ prompt: input, modelType }),
       });
 
       const data = await response.json();
-      
       if (data.text) {
-        setMessages(prev => [...prev, { role: 'bot', text: data.text }]);
-      } else {
-        throw new Error(data.error || "خطأ في الاستجابة");
+        setMessages(prev => [...prev, { role: 'bot', text: data.text, timestamp: new Date() }]);
       }
     } catch (error) {
-      console.error("Error:", error);
       setMessages(prev => [...prev, { role: 'bot', text: "عذراً، واجهت مشكلة في الاتصال بالبصيرة." }]);
     } finally {
       setLoading(false);
@@ -53,71 +50,109 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white font-sans">
-      {showDisclaimer && <DisclaimerPopup onAgree={() => setShowDisclaimer(false)} />}
-      {showSettings && <SettingsPage onClose={() => setShowSettings(false)} />}
+    <div className="min-h-screen bg-[#050505] text-zinc-200 font-sans selection:bg-amber-500/30">
+      <AnimatePresence>
+        {showDisclaimer && <DisclaimerPopup onAgree={() => setShowDisclaimer(false)} />}
+        {showSettings && <SettingsPage onClose={() => setShowSettings(false)} />}
+      </AnimatePresence>
       
-      <header className="p-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-xl fixed top-0 w-full z-50">
+      {/* Header الملكي */}
+      <header className="p-4 border-b border-white/5 flex justify-between items-center bg-black/60 backdrop-blur-2xl fixed top-0 w-full z-50">
         <div className="flex items-center gap-3">
-          <Scale className="text-amber-500" />
-          <h1 className="text-xl font-bold italic luxury-text-gradient">Basira AI</h1>
+          <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20">
+            <Scale className="text-amber-500 w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-lg font-black tracking-tighter text-white italic">BASIRA AI</h1>
+            <p className="text-[10px] text-amber-500/60 font-bold uppercase tracking-widest">Pro Ultimate</p>
+          </div>
         </div>
-        <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-          <Settings className="w-6 h-6 text-zinc-400" />
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* زر التبديل بين المحركات */}
+          <button 
+            onClick={() => setModelType(modelType === "gemini" ? "groq" : "gemini")}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold hover:bg-white/10 transition-all"
+          >
+            {modelType === "gemini" ? <Brain className="w-3 h-3 text-purple-400" /> : <Zap className="w-3 h-3 text-amber-400" />}
+            {modelType.toUpperCase()}
+          </button>
+          <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-white/5 rounded-full">
+            <Settings className="w-5 h-5 text-zinc-500" />
+          </button>
+        </div>
       </header>
 
-      <main className="pt-32 pb-40 px-6 max-w-3xl mx-auto space-y-6">
+      {/* منطقة الدردشة */}
+      <main className="pt-28 pb-44 px-4 max-w-4xl mx-auto">
         {messages.length === 0 && (
-          <div className="text-center py-20 space-y-4 opacity-50">
-            <Scale className="w-12 h-12 mx-auto text-amber-500/50" />
-            <p className="text-lg italic">كيف يمكن للبصيرة مساعدتك اليوم؟</p>
-          </div>
-        )}
-        {messages.map((msg, i) => (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            key={i} 
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-              msg.role === 'user' 
-                ? 'bg-amber-500 text-black font-bold shadow-lg shadow-amber-500/10' 
-                : 'bg-zinc-900 border border-white/5 text-zinc-200'
-            }`}>
-              {msg.text}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 space-y-6">
+            <div className="relative inline-block">
+               <Scale className="w-16 h-16 mx-auto text-amber-500/20 animate-pulse" />
+               <div className="absolute inset-0 bg-amber-500/5 blur-3xl rounded-full" />
             </div>
+            <h2 className="text-2xl font-serif italic text-white">مرحباً بك في حضرة البصيرة</h2>
+            <p className="text-zinc-500 max-w-xs mx-auto text-sm">اسأل عن القضايا، العقود، أو التحليلات القانونية المعقدة.</p>
           </motion.div>
-        ))}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-zinc-900 p-4 rounded-2xl border border-white/5 flex gap-2">
-              <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-              <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce [animation-delay:0.4s]" />
-            </div>
-          </div>
         )}
+
+        <div className="space-y-8">
+          {messages.map((msg, i) => (
+            <motion.div 
+              initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              key={i} 
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`relative group max-w-[90%] p-5 rounded-[28px] text-sm leading-relaxed ${
+                msg.role === 'user' 
+                  ? 'bg-amber-500 text-black font-bold shadow-2xl shadow-amber-500/20' 
+                  : 'bg-zinc-900/50 border border-white/5 text-zinc-300 backdrop-blur-sm'
+              }`}>
+                {msg.text}
+                <div className={`absolute top-full mt-2 text-[9px] opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'right-2' : 'left-2'}`}>
+                  {new Date(msg.timestamp).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex gap-1.5">
+                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" />
+                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
       </main>
 
-      <div className="fixed bottom-0 w-full p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
-        <div className="max-w-3xl mx-auto flex gap-2 bg-zinc-900 p-2 rounded-2xl border border-white/10 shadow-2xl">
-          <input 
-            value={input} 
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            className="flex-1 bg-transparent p-3 outline-none text-sm" 
-            dir="rtl" 
-            placeholder="اسأل بصيرة عن أي استشارة قانونية..." 
-          />
-          <button 
-            onClick={handleSendMessage} 
-            disabled={loading}
-            className="bg-amber-500 hover:bg-amber-600 p-3 rounded-xl text-black transition-all disabled:opacity-50"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+      {/* منطقة الإدخال الخارقة */}
+      <div className="fixed bottom-0 w-full p-4 sm:p-8 bg-gradient-to-t from-[#050505] via-[#050505] to-transparent">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3 bg-zinc-900/80 backdrop-blur-2xl p-2 rounded-[32px] border border-white/10 shadow-2xl focus-within:border-amber-500/50 transition-all">
+            <button className="p-3 hover:bg-white/5 rounded-full text-zinc-500 hover:text-amber-500 transition-colors">
+              <FileText className="w-5 h-5" />
+            </button>
+            <input 
+              value={input} 
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              className="flex-1 bg-transparent p-3 outline-none text-sm placeholder:text-zinc-600" 
+              dir="rtl" 
+              placeholder="اكتب استشارتك هنا..." 
+            />
+            <button 
+              onClick={handleSendMessage} 
+              disabled={loading || !input.trim()}
+              className="bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 p-4 rounded-[24px] text-black transition-all shadow-xl shadow-amber-500/20 active:scale-95"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-center text-[9px] text-zinc-600 mt-4 uppercase tracking-[0.2em]">Powered by Basira Intelligence Engine</p>
         </div>
       </div>
     </div>
